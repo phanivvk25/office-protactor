@@ -7,6 +7,9 @@
 3. On open, the **camera is switched on automatically, after the respondent consents**,
    and stays on while they answer.
 
+**Context:** internal use only. Employees in our own Microsoft 365 tenant take skill-set
+evaluations. This is not an external or public exam. See §2a for what that changes.
+
 ## 2. Verdict
 
 **Achievable, but not inside Microsoft Forms itself.** It needs a small wrapper web app
@@ -23,6 +26,17 @@
 "Automatically" therefore means: **the consent prompt appears automatically, and the camera
 starts the moment the respondent agrees.** Starting the camera with no user action is
 impossible in every modern browser, and it would also defeat the consent requirement.
+
+## 2a. What changes because this is internal (team skill evaluation)
+
+| Area | Effect |
+|---|---|
+| Identity | Easier. Everyone is in the same Entra ID tenant. Use *"Only people in my organization can respond"* and *"Record name"*, plus single sign-on in the proctor page. |
+| Sign-in inside the iframe | Lower risk than for external users, because people are already signed in to Microsoft 365 in the browser. It still needs checking in the proof of concept: Safari and strict third-party-cookie settings can break it. Managed Edge or Chrome via Intune can be configured to allow it. |
+| Hosting | Can be internal-only, for example Azure Static Web Apps limited to the tenant, or a SharePoint/Teams tab. Teams tabs can request the camera through the Teams JS SDK device permissions. |
+| Stakes | Lower than a certification exam, so a lighter build is enough: periodic snapshots plus a tab-switch log, no video and no face analysis. |
+| Employee monitoring (the main new constraint) | Camera monitoring of employees is regulated more strictly than monitoring students. Consent from an employee is often **not considered "freely given"** (GDPR, because of the employer–employee power imbalance), so do not rely on consent alone. Involve HR, Legal and the DPO, and the works council or union where one exists (mandatory in e.g. Germany). Document the legitimate purpose. Offer a non-camera alternative with no penalty. State in writing that the recordings are not used for performance or disciplinary decisions beyond the evaluation itself. |
+| Is a camera needed at all? | Worth asking. For internal skill mapping, the honesty-statement + time-limit + randomised-question approach is often enough, and it avoids the monitoring issues. Recommendation: make the camera **optional or limited to specific high-stakes evaluations**. |
 
 ## 3. Why Forms alone cannot do it
 
