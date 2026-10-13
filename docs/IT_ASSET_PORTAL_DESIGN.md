@@ -1,8 +1,22 @@
 # IT Device & Asset Management Portal: Workflows and Features
 
-Status: **draft for review (v4: any OS, Asia, HR bundle, last-day lock and legal escalation)**.
+Status: **draft for review (v5: decisions recorded, recovery options, Microsoft 365, OTP signing, tech stack)**.
 No code yet. Once this is agreed, the next step is the technical design and code
 generation plan.
+
+## 0. Decisions so far
+
+| # | Topic | Decision |
+|---|---|---|
+| 1 | Countries | **Configured by the organisation**, not hard-coded. Each country is a configuration record (§5.15). Starting region: Asia. |
+| 2 | Laptop stock | **Per country**: local stock and/or local vendors ship within the country (no cross-border shipping). |
+| 3 | Lock time on LWD | **Midnight (00:00) at the end of the LWD**, in the employee's local time zone. |
+| 4 | Offline limit during notice period | **Configurable**; default **48 hours**. |
+| 5 | Legal notice templates | **Not drafted yet.** The portal provides a template editor and placeholders; Legal drafts the text with counsel per country (§5.18). |
+| 6 | Recovery before court | Recovery ladder with per-country options (§4.6). |
+| 7 | Identity provider | **Microsoft 365** (Microsoft Entra ID) (§1.3). |
+| 8 | Document signing | **OTP-based signing inside the portal** (§5.17). |
+| 9 | Tech stack and hosting | Proposal in §7.1, to be confirmed. |
 
 ## 1. Context and assumptions
 
@@ -17,8 +31,9 @@ generation plan.
   USB/COM ports, camera, microphone, Bluetooth, admin rights and installed software.
 - **Any laptop OS is allowed**: Windows (Home or Pro), macOS, Linux. Each OS is managed as
   far as it technically allows (see §1.2).
-- **Employees live in Asian countries only** for now (e.g. India, Philippines, Indonesia,
-  Vietnam, Malaysia, Singapore). Shipping, privacy law and legal recovery follow the
+- **Employees live in Asian countries only** for now. The list of countries is **set by the
+  organisation** in the portal (e.g. India, Philippines, Indonesia, Vietnam, Malaysia,
+  Singapore). Shipping, privacy law and legal recovery follow the
   employee's country.
 - **No HR tool exists.** The portal includes an **HR add-on bundle** (§5.17) that holds
   the employee record, joining date and last working day.
@@ -71,6 +86,24 @@ Other facts that hold whatever tool is chosen:
 | Disk encryption mandatory | Required on every laptop. It is what makes the last-day lock real (§4.3). Laptops that cannot be encrypted are flagged and not issued, or issued only with IT approval. |
 | Apple push certificate | Managing Macs needs an Apple push certificate. The organisation creates it for free and renews it every year (the portal reminds IT before expiry). |
 | Agent removal | Employees get **standard (non-admin) accounts**, so they cannot remove the agent. The portal alerts when a device stops reporting. |
+
+### 1.3 Microsoft 365 as identity provider
+
+The organisation uses Microsoft 365, so Microsoft Entra ID (included with every Microsoft
+365 plan) is the first **identity provider**. The free features are enough:
+
+| Need | How (Microsoft Graph API / Entra ID) |
+|---|---|
+| Sign-in to the portal | Single sign-on with Entra ID (OpenID Connect). MFA through Entra ID security defaults or the Microsoft Authenticator app. |
+| Employee and group list | Read users and groups (department, manager, country) to match HR bundle records. |
+| Create account for a new hire | Create user, assign licence and groups from the role (optional; IT can also do it manually). |
+| Offboarding at midnight on LWD | **Disable the account** and **revoke all sign-in sessions**, at the same moment the laptop locks. Mailbox can be converted to a shared mailbox for the manager. |
+| Notifications | Email sent through the organisation's own Microsoft 365 mailbox; optional Microsoft Teams messages. |
+
+Limit: blocking access from non-compliant laptops ("conditional access") needs Entra ID P1,
+which is not in the cheaper Microsoft 365 plans. Without it, the portal alerts IT and the
+employee instead. (If the organisation ever moves to Microsoft 365 Business Premium, Intune
+is included in it; the device provider interface would let the portal use it.)
 
 ## 2. Users and roles
 
@@ -136,7 +169,7 @@ device fails to check in after delivery (alert IT), start date moved.
 | # | Step | Owner | System action |
 |---|---|---|---|
 | 1 | Resignation or termination recorded with **last working day (LWD)** | HR (HR bundle) | **Offboarding Case** created listing all assets held by that person. Employee's verified address and time zone attached. |
-| 2 | Lock scheduled | Auto | A **signed lock order** for LWD (end of day, employee's local time) is sent to the laptop straight away, so it fires even if the laptop is offline on that day (§4.3). |
+| 2 | Lock scheduled | Auto | A **signed lock order** for **midnight at the end of the LWD** (employee's local time) is sent to the laptop straight away, so it fires even if the laptop is offline on that day (§4.3). |
 | 3 | Return pickup booked for LWD or LWD + 1 | Logistics | Shipping provider. Employee gets pickup slot and packing instructions. |
 | 4 | Reminders before LWD | Auto | LWD − 7, − 3, − 1: "Back up anything you need; the laptop will be locked on <date>; pickup on <date>". |
 | 5 | **LWD: accounts disabled and laptop locked** | Auto | Identity provider disables accounts and ends sessions. Laptop locks and cannot be used (§4.3). Lock screen shows return instructions and IT contact. |
@@ -166,7 +199,7 @@ is online or offline, and even if the OS is reinstalled.
 |---|---|
 | 1. Scheduled lock order | When LWD is set, the portal sends a signed lock order with the date and time. The agent stores it and locks the laptop at that time even with no internet. The agent uses trusted time (last server time + its own elapsed-time counter), so changing the PC clock does not delay it. |
 | 2. Live lock command | At LWD the portal also sends a lock command through the device provider. Whichever arrives first wins. |
-| 3. Offline limit ("check-in lease") | During the notice period the laptop must contact the server at least every 24–48 hours (configurable). If it does not, it locks itself. For other employees a longer limit (e.g. 14–30 days) can be set as a protection against loss. |
+| 3. Offline limit ("check-in lease") | During the notice period the laptop must contact the server at least every **48 hours** (configurable). If it does not, it locks itself. For other employees a longer limit (e.g. 14–30 days) can be set as a protection against loss. |
 
 **How the laptop is locked (per OS):**
 
@@ -225,10 +258,7 @@ company property is commonly pursued as criminal breach of trust and/or a civil 
 suit. Each country's templates and steps must be **confirmed by local counsel**; the portal
 holds them as configuration and does not give legal advice.
 
-**Alternatives before court** (configurable, subject to local labour law): hold relieving /
-experience letter, recover the device value from the final settlement, or offer a "buy-out"
-at depreciated value. Whether these are lawful varies by country, so each is off by default
-and enabled per country by Legal.
+**Alternatives before court:** see the recovery ladder in §4.6.
 
 ### 4.5 Other workflows
 
@@ -242,6 +272,39 @@ and enabled per country by Legal.
 | **Accessory requests** | Monitor, headset, dock, etc. Approved by manager, shipped and tracked. |
 | **Address change / relocation** | Employee requests address change with proof; HR approves. Country change flags different shipping, privacy and legal rules. |
 | **First-time setup** | Enable HR bundle and import employees → connect identity provider → connect device provider (incl. Apple push certificate) → choose default policy sets → import existing laptops (CSV) and enrol them in place with a link. |
+
+### 4.6 Recovery options before (or alongside) a court case
+
+Going to court is slow and costly, and often costs more than an old laptop is worth. The
+portal therefore supports a **recovery ladder**: a set of softer steps that run before (or
+alongside) the legal steps in §4.4. Each step is a **per-country setting** that Legal turns
+on only after local counsel confirms it is lawful there. Everything below is a description of
+the options, **not legal advice**.
+
+| # | Option | How it works | Legal / practical points to confirm per country | What the portal does |
+|---|---|---|---|---|
+| 1 | **Make returning easy** | Free doorstep pickup booked for LWD; packing material sent in advance; flexible re-booking by the employee. | None. Most non-returns are delays, not theft. Doing this well removes most cases. | Pickup booking, slot changes by employee, reminders by SMS/WhatsApp/email, call task for HR. |
+| 2 | **Lock + on-screen message** | Laptop is locked at midnight on LWD (§4.3) with "This laptop belongs to <Org>. Please return it. Contact: …". | Lawful for company-owned devices when disclosed in the custody agreement. | Lock service; message text per country/language. |
+| 3 | **Hold exit documents** | Relieving letter / experience certificate issued only after "IT assets returned" is cleared. | **Risky in several countries.** Some labour authorities and courts treat withholding of service/experience documents as unfair. Often allowed only for a short, reasonable period and must be written in the contract/policy. Keep separate from statutory documents that must always be issued. | Exit clearance blocks the letter; maximum hold days per country; HR can override with reason. |
+| 4 | **Adjust against final settlement** | Unpaid device value (book value, not purchase price) deducted from the full-and-final settlement. | **Strictly regulated.** Wage laws usually allow deductions for loss of employer property only under conditions: written agreement, employee responsible, chance to explain, amount fair, and limits on how much can be deducted (e.g. Philippines limits deductions for loss/damage; Singapore and India wage laws list permitted deductions). Usually allowed only from amounts the law permits, not from statutory dues (e.g. gratuity). Must be confirmed by counsel per country. | Calculates book value (depreciation schedule); creates a "show-cause" notice and records the employee's reply; generates a deduction statement for payroll (payroll itself is outside the portal). |
+| 5 | **Buy-out offer** | Employee may keep the laptop by paying its depreciated value (and the laptop is then wiped and released). | Low legal risk; an agreed sale. Tax/GST treatment of the sale per country. | Offer letter via OTP acceptance; payment link or payroll adjustment; on payment: remote wipe, release from management, asset → "Sold to employee". |
+| 6 | **Refundable security deposit** (optional, at onboarding) | Small deposit collected at joining, refunded when the laptop is returned. | Not allowed or discouraged in some countries/industries; can hurt hiring. Usually **not recommended**; listed for completeness. | Deposit record and refund trigger. |
+| 7 | **Formal demand notice** | Written demand from HR with a deadline, sent to the verified address. | Standard first formal step; needed as evidence for later steps. | §4.4: template, registered post/courier tracking, proof of delivery. |
+| 8 | **Lawyer's legal notice** | Notice from external counsel stating the claim and intended action. | Often leads to return without a case. | §4.4 / §5.18. |
+| 9 | **Mediation / conciliation** | Labour office or mediation centre, where available. | Available in some countries; cheaper and faster than court. | Track as a case stage. |
+| 10 | **Police complaint / criminal case** | E.g. criminal breach of trust (in India, now under the Bharatiya Nyaya Sanhita). | Police may treat it as a civil matter; strong evidence pack needed. Jurisdiction based on facts of the case — counsel decides; portal suggests from the employee's address. | Evidence pack, jurisdiction suggestion, case tracking. |
+| 11 | **Civil recovery suit** | Claim for return of the asset or its value. | Slow; usually worth it only for high-value assets or as a deterrent. Small-claims routes exist in some countries. | Same as above. |
+| 12 | **Write-off** | Close the case and record the loss. | Decided when cost of recovery > value. | Write-off approval; finance report; device stays locked and blocked. |
+
+**Not supported, on purpose:** publishing employee names, reporting to background-check
+databases or contacting family members beyond the declared emergency contact. These carry
+defamation and privacy risk (e.g. under India's DPDP Act) and are left out unless Legal
+explicitly adds them later.
+
+**Default ladder (suggested, per country editable):** 1 → 2 → reminders → 5 (buy-out offer
+at LWD + 7) → 7 (LWD + 10) → 4 (only if counsel approved) → 8 (LWD + 25) → 9 / 10 / 11 or
+12 (decision at LWD + 40). The portal recommends the next step from the device's book value
+and the cost of each step, but a person always decides.
 
 ## 5. Feature list by module
 
@@ -371,6 +434,11 @@ Policy features:
 - Master data: device models, policy sets, warehouses / return addresses, countries,
   checklists, notification templates.
 - Certificate and credential expiry reminders (e.g. Apple push certificate, API keys).
+- **Country configuration** (one record per country, added by the organisation): time zone(s),
+  languages, currency, laptop stock locations and vendors, couriers, SMS gateway, notice
+  periods, lock time (default midnight), offline limit (default 48 h), recovery ladder steps
+  allowed (§4.6), notice templates, jurisdiction table, privacy settings (what ID data may be
+  stored, retention), public holidays.
 
 ### 5.16 Integrations (through provider interfaces, all optional and replaceable)
 - Identity: Google Workspace, Microsoft 365 (any plan), Okta, Keycloak.
@@ -402,8 +470,24 @@ rest of the portal. Payroll, leave and attendance are not part of it for now.
   address updated.
 - **Exit clearance checklist:** IT assets returned, manager handover, finance, HR. Shows
   which items block the relieving letter (per country rules, §4.4).
-- **Documents and e-sign:** offer letter, asset custody agreement, acceptable-use policy,
-  relieving letter; signed with an e-signature provider or an OTP-based in-portal signature.
+- **Documents and OTP signing:** offer letter, asset custody agreement, acceptable-use
+  policy, buy-out offer, relieving letter. Signing inside the portal:
+  1. Employee opens the document (must scroll to the end).
+  2. One-time password sent to the **verified mobile number (SMS)** and email.
+  3. On correct OTP, the portal stores: document hash (SHA-256), signer, time, IP address,
+     device/browser, OTP delivery records.
+  4. A signed PDF is created with a **signature certificate page** and sealed with the
+     organisation's digital certificate, so any later change is detectable.
+  5. Copy emailed to the employee.
+
+  Legal note: OTP acceptance is generally valid for forming a contract electronically, but
+  in some countries it is weaker evidence than a certified digital signature. In India, for
+  example, only listed methods (such as Aadhaar-based eSign or digital signature
+  certificates) count as an "electronic signature" under the IT Act, and electronic records
+  used in court need a supporting certificate under the Evidence law. The portal can produce
+  the technical details for that certificate. If counsel wants stronger signatures for the
+  custody agreement, a certified e-sign provider can be added later through the e-signature
+  interface.
 - **Emergency / alternate contact** (used for return follow-up).
 - **Org chart and directory.**
 
@@ -411,7 +495,10 @@ rest of the portal. Payroll, leave and attendance are not part of it for now.
 
 - Non-return cases with status: *Reminder → Demand notice → Legal notice → Filed →
   Hearing → Recovered / Settled / Written off*.
-- Notice templates per country and language; generated with employee and asset data.
+- **Template editor** for notices (none drafted yet): Legal drafts the text per country and
+  language with counsel; placeholders such as {employee_name}, {address}, {asset_serial},
+  {asset_value}, {lwd}, {deadline}; versioned, and each version needs Legal approval before
+  use.
 - Dispatch tracking for registered post / courier, with proof of delivery attached.
 - **Jurisdiction table** per country (postal code / district → police station, court).
 - External lawyer directory per region; assignment and access limited to their cases.
@@ -468,6 +555,23 @@ rest of the portal. Payroll, leave and attendance are not part of it for now.
        Employee laptops (Windows Home/Pro, macOS, Linux)
 ```
 
+### 7.1 Proposed tech stack and hosting (to confirm)
+
+| Part | Proposal | Why |
+|---|---|---|
+| Web portal (frontend) | React + TypeScript, Microsoft Fluent UI components | Common, many developers; Fluent matches Microsoft 365 look. |
+| Portal backend | TypeScript (Node.js, NestJS) REST API | Same language as frontend; good Microsoft Graph SDK. |
+| Database | PostgreSQL | Free, reliable; row-level history for audit. |
+| Job queue / schedules | Redis + BullMQ (or PostgreSQL-based queue) | Lock schedules, retries, reminders. |
+| Documents and evidence | Object storage (Azure Blob / S3-compatible) with versioning and immutability (write-once) for legal records | Tamper-evident evidence. |
+| Device server + **agent** | **Go** | One small binary per OS (Windows, macOS, Linux), runs as a system service, easy cross-compiling. Open-source Go components exist for Apple device management. |
+| Secrets / keys (recovery keys, PINs, signing keys) | Azure Key Vault (or HashiCorp Vault) | Keys never stored in plain text. |
+| Sign-in | Microsoft Entra ID (MSAL) | Decision 7. |
+| SMS / OTP / WhatsApp | Provider adapter, local SMS gateway per country | Delivery rates and cost differ by country. |
+| Hosting | **Azure, Asian region** (e.g. Central India or Southeast Asia/Singapore), containers (Docker); portable to any cloud or on-premises | Fits Microsoft 365; low latency for Asian employees; data stays in Asia. |
+| CI/CD | GitHub Actions | Repository already on GitHub. |
+| Code signing | Windows code-signing certificate, Apple Developer ID (notarisation) | Agent must be signed to install cleanly. |
+
 ## 8. Suggested phasing
 
 | Phase | Scope |
@@ -488,14 +592,11 @@ rest of the portal. Payroll, leave and attendance are not part of it for now.
 
 ## 10. Open questions for review
 
-1. Which Asian countries are in scope first, and roughly how many employees in each?
-2. Who keeps laptop stock and ships them: one central location (cross-border shipping with
-   customs and battery rules) or stock / vendor per country (recommended)?
-3. Lock time on LWD: end of working day (e.g. 18:00 local), or midnight?
-4. Offline limit during notice period: 24 hours, 48 hours, or other?
-5. Do you already have external lawyers per country/region, and legal notice templates?
-6. Which recovery steps are allowed before court (hold relieving letter, deduct from final
-   settlement, buy-out)? To be confirmed per country with counsel.
-7. Which identity provider is used today (Google Workspace, Microsoft 365, other)?
-8. Is a third-party e-signature service acceptable, or OTP-based signing inside the portal?
-9. Preferred tech stack and hosting (cloud region, or on-premises)?
+1. Confirm the tech stack and hosting proposal (§7.1).
+2. First country to go live (its templates, couriers and jurisdiction table are built first)?
+3. Approximate number of employees and laptops at start, and expected growth?
+4. Which recovery-ladder steps (§4.6) should be available, subject to counsel's review?
+5. Microsoft 365 plan in use (Business Basic / Standard / other)? It decides which
+   identity features are available.
+6. Should the portal create Microsoft 365 accounts for new hires, or only disable them on
+   LWD?
